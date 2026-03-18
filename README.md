@@ -23,6 +23,7 @@ including PDF and other file types.
 - **File I/O** — Reading and transferring files between client and server
 
 ## System Architecture
+
 Client 1 ──┐
 Client 2 ──┼──→ Server (Authentication + File Transfer)
 Client 3 ──┘
