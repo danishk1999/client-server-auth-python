@@ -1,56 +1,109 @@
-# 🔒 Client-Server Authentication — Python
-**Course:** CMPT 361 — Intro to Networks  
-**Institution:** MacEwan University  
-**Status:** ✅ Completed
+CMPT 361 – Secure Mail Transfer Protocol
+A reasonably secure email transfer system built in Python 3, developed as a course project for CMPT 361 at MacEwan University.
+The system implements a client-server architecture where five known clients can securely exchange emails through a central mail server over TCP. All communication is protected using RSA public-key cryptography for authentication and AES-ECB for symmetric session encryption.
 
-## Overview
-Implemented a client-server authentication system using Python socket 
-programming. The system supports multiple simultaneous client connections 
-to a single server, with secure authentication and file transfer capabilities 
-including PDF and other file types.
+Features
 
-## Features
-- Multiple clients connecting to one server simultaneously
-- Secure user authentication protocol
-- File transfer support (PDF and other file formats)
-- Socket-based communication using Python
-- Server-side client management and session handling
+Mutual authentication – clients authenticate to the server using RSA-encrypted credentials; the server responds with a freshly generated AES session key encrypted with the client's public key
+Symmetric encryption – all post-handshake traffic is AES-ECB encrypted using a per-session 256-bit key
+Concurrent clients – the server uses os.fork() to handle all five known clients simultaneously
+Four mail operations – send email, view inbox, read a specific email, terminate connection
+Replay attack defence – the enhanced protocol wraps every message in a nonce + timestamp envelope before encryption, blocking both delayed and immediate replay attacks
 
-## Technologies Used
-- **Python** — Core programming language
-- **Python Socket Library** — Low-level network communication
-- **Threading** — Handling multiple simultaneous client connections
-- **File I/O** — Reading and transferring files between client and server
 
-## System Architecture
+Project Structure
+.
+├── key_generator.py        # Generates RSA key pairs and user_pass.json
+├── Server.py               # Mail server (original protocol)
+├── Client.py               # Mail client (original protocol)
+├── Server_enhanced.py      # Mail server with replay-attack defence
+├── Client_enhanced.py      # Mail client with replay-attack defence
+└── README.md
 
-Client 1 ──┐
-Client 2 ──┼──→ Server (Authentication + File Transfer)
-Client 3 ──┘
+Note: .pem key files and user_pass.json are not committed to this repository. Generate them locally using key_generator.py before running the programs.
 
-## How It Works
-1. Server starts and listens for incoming connections
-2. Client connects and sends credentials for authentication
-3. Server verifies credentials and grants or denies access
-4. Authenticated clients can request file transfers from the server
-5. Server handles multiple clients concurrently using threading
 
-## Key Learnings
-- Python socket programming fundamentals
-- Client-server architecture design
-- Multi-threaded server implementation
-- Network authentication protocols
-- File transfer over TCP sockets
+Requirements
 
-## Usage
-```bash
-# Start the server
-python server.py
+Python 3.x
+pycryptodome
 
-# Connect a client
-python client.py
-```
+bashpip install pycryptodome
 
-## Note
-This project was developed for academic purposes to demonstrate 
-network programming and authentication concepts.
+Setup
+1. Generate keys and credentials
+Run this once in the directory where the server will be hosted:
+bashpython3 key_generator.py
+This creates:
+
+server_private.pem and server_public.pem
+client1_private.pem ... client5_private.pem (and matching public keys)
+user_pass.json with credentials for all five clients
+Inbox folders: client1/ ... client5/
+
+2. Distribute files to client machines
+Each client machine needs:
+
+Client.py (or Client_enhanced.py)
+server_public.pem
+[username]_private.pem and [username]_public.pem for that client
+
+
+Usage
+Start the server
+bashpython3 Server.py
+The server is ready to accept connections
+Connect a client
+bashpython3 Client.py
+Enter the server IP or name: cc5-212-05.macewan.ca
+Enter your username: client1
+Enter your password: password1
+
+Select the operation:
+1) Create and send an email
+2) Display the inbox list
+3) Display the email contents
+4) Terminate the connection
+choice:
+Start the enhanced server (replay-attack resistant)
+bashpython3 Server_enhanced.py
+python3 Client_enhanced.py
+
+Protocol Overview
+Client                                      Server
+  |                                           |
+  |── RSA-encrypt(username + password) ──────>|
+  |                                           |── validate credentials
+  |<── RSA-encrypt(AES session key) ──────────|
+  |                                           |
+  |── AES-encrypt("OK") ───────────────────>  |
+  |                                           |
+  |<── AES-encrypt(menu) ─────────────────────|
+  |── AES-encrypt(choice) ──────────────────> |
+  |                                           |
+  |    ... subprotocol for chosen operation ...|
+  |                                           |
+  |── AES-encrypt("4") ────────────────────>  |── close connection
+
+Enhanced Protocol – Replay Attack Defence
+The attack
+AES-ECB produces identical ciphertext for identical plaintext. An attacker who intercepts a packet can re-transmit it later without decrypting it, causing the server to repeat an action (e.g. re-authenticate a user or re-deliver an email).
+The defence
+Every message is wrapped in a nonce + timestamp envelope before encryption:
+[ 8 bytes: UNIX timestamp ] [ 16 bytes: random nonce ] [ payload ]
+The receiver rejects the message if:
+
+The timestamp is more than 60 seconds old (blocks delayed replays)
+The nonce has already been seen in this session (blocks immediate replays)
+
+
+Allowed Imports (per course specification)
+pythonimport json
+import socket
+import os, glob, datetime
+import sys
+# Any module from the Crypto (pycryptodome) library
+
+Author
+Danish Kumar – 3128352
+MacEwan University, CMPT 361 – Fall 2024
